@@ -1,0 +1,6 @@
+keras
+gensim
+num2words
+nltk
+numpy
+pandas

@@ -33,7 +33,7 @@ gloveDir = ""
 
 NUM_FOLDS = None                   # Value of K in K-fold Cross Validation
 NUM_CLASSES = None                 # Number of classes - Happy, Sad, Angry, Others
-MAX_NB_WORDS = None                # To set the upper limit on the number of tokens extracted using keras.preprocessing.text.Tokenizer 
+MAX_NB_WORDS = None                # To set the upper limit on the number of tokens extracted using keras.preprocessing.text.Tokenizer
 MAX_SEQUENCE_LENGTH = None         # All sentences having lesser number of words than this will be padded
 EMBEDDING_DIM = None               # The dimension of the word embeddings
 BATCH_SIZE = None                  # The batch size to be chosen for training the model.
@@ -41,150 +41,8 @@ LSTM_DIM = None                    # The dimension of the representations learnt
 DROPOUT = None                     # Fraction of the units to drop for the linear transformation of the inputs. Ref - https://keras.io/layers/recurrent/
 NUM_EPOCHS = None                  # Number of epochs to train a model for
 
-
-label2emotion = {0:"others", 1:"happy", 2: "sad", 3:"angry"}
-emotion2label = {"others":0, "happy":1, "sad":2, "angry":3}
-
-
-def decontracted(phrase):
-    # specific
-    phrase = re.sub(r"won't", "will not", phrase)
-    phrase = re.sub(r"can\'t", "can not", phrase)
-    phrase = re.sub(r"won’t", "will not", phrase)
-    phrase = re.sub(r"can\’t", "can not", phrase)
-    # general
-    phrase = re.sub(r"n\'t", " not", phrase)
-    phrase = re.sub(r"\'re", " are", phrase)
-    phrase = re.sub(r"\'s", " is", phrase)
-    phrase = re.sub(r"\'d", " would", phrase)
-    phrase = re.sub(r"\'ll", " will", phrase)
-    phrase = re.sub(r"\'l", " will", phrase)
-    phrase = re.sub(r"\'t", " not", phrase)
-    phrase = re.sub(r"\'ve", " have", phrase)
-    phrase = re.sub(r"\'m", " am", phrase)
-    phrase = re.sub(r"\'em", " them", phrase)
-    phrase = re.sub(r"\'nt", " not", phrase)
-    
-    phrase = re.sub(r"n\’t", " not", phrase)
-    phrase = re.sub(r"\’re", " are", phrase)
-    phrase = re.sub(r"\’s", " is", phrase)
-    phrase = re.sub(r"\’d", " would", phrase)
-    phrase = re.sub(r"\’ll", " will", phrase)
-    phrase = re.sub(r"\’l", " will", phrase)
-    phrase = re.sub(r"\’t", " not", phrase)
-    phrase = re.sub(r"\’ve", " have", phrase)
-    phrase = re.sub(r"\’m", " am", phrase)
-    phrase = re.sub(r"\’em", " them", phrase)
-    phrase = re.sub(r"\’nt", " not", phrase)
-    
-    return phrase
-
-
-label2emotion = {0:"others", 1:"happy", 2: "sad", 3:"angry"}
-emotion2label = {"others":0, "happy":1, "sad":2, "angry":3}
-def preprocessData(dataFilePath, mode):
-    """Load data from a file, process and return indices, conversations and labels in separate lists
-    Input:
-        dataFilePath : Path to train/test file to be processed
-        mode : "train" mode returns labels. "test" mode doesn't return labels.
-    Output:
-        indices : Unique conversation ID list
-        conversations : List of 3 turn conversations, processed and each turn separated by the <eos> tag
-        labels : [Only available in "train" mode] List of labels
-    """
-
-    with open('../emoji/emoji_ranks.json', 'r') as fn:
-        e_data = json.load(fn)
-    
-    pos_emoticons = e_data['pos']
-    neg_emoticons = e_data['neg']
-    neutral_emoticons = e_data['neu']
-        
-    # Emails
-    emailsRegex=re.compile(r'[\w\.-]+@[\w\.-]+')
-
-    # Mentions
-    userMentionsRegex=re.compile(r'(?<=^|(?<=[^a-zA-Z0-9-_\.]))@([A-Za-z]+[A-Za-z0-9]+)')
-
-    #Urls
-    urlsRegex=re.compile(r'(f|ht)(tp)(s?)(://)(.*)[.|/][^ ]+') # It may not be handling all the cases like t.co without http
-
-    #Numerics
-    numsRegex=re.compile(r"\b\d+\b")
-
-    punctuationNotEmoticonsRegex=re.compile(r'([!?.,]){2,}')
-    
-    elongatedWords = re.compile(r'\b(\S*?)(.)\2{2,}\b')
-    allCaps = re.compile(r"((?![<]*}) [A-Z][A-Z]+)")
-
-    emoticonsDict = {}
-    for i,each in enumerate(pos_emoticons):
-        emoticonsDict[each]= ' <SMILE> '
-    for i,each in enumerate(neg_emoticons):
-        emoticonsDict[each]=' <SADFACE> '
-    for i,each in enumerate(neutral_emoticons):
-        emoticonsDict[each]=' <NEUTRALFACE> '
-    # use these three lines to do the replacement
-    rep = dict((re.escape(k), v) for k, v in emoticonsDict.items())
-    emoticonsPattern = re.compile("|".join(rep.keys()))
-    indices = []
-    conversations = []
-    labels = []
-    u1 = []
-    u2 = []
-    u3 = []
-    indices = []
-    
-    with io.open(dataFilePath, encoding="utf8") as finput:
-        finput.readline()
-        for row in finput:
-            # Convert multiple instances of . ? ! , to single instance
-            # okay...sure -> okay . sure
-            # okay???sure -> okay ? sure
-            # Add whitespace around such punctuation
-            # okay!sure -> okay ! sure
-#             repeatedChars = ['.', '?', '!', ',']
-            
-            items = row.strip('\n').split('\t')
-            line = '\t'.join(items[1:4])
-            line = emoticonsPattern.sub(lambda m: rep[re.escape(m.group(0))], line.strip())
-            line = userMentionsRegex.sub(' <USER> ', line )
-            line = emailsRegex.sub(' <EMAIL> ', line )
-            line = urlsRegex.sub(' <URL> ', line)
-            line = numsRegex.sub(' <NUMBER> ',line)
-            line = punctuationNotEmoticonsRegex.sub(r' \1 <REPEAT> ',line)
-            line = elongatedWords.sub(r'\1\2 <ELONG> ', line)
-            line = allCaps.sub(r'\1 <ALLCAPS> ', line)
-            line = re.sub('([.,!?])', r' \1 ', line)
-            line = re.sub(r"[-+]?[.\d]*[\d]+[:,.\d]*", r" <NUMBER> ", line)
-            line = re.sub(r'(.)\1{2,}', r'\1\1',line)
-            line = line.strip().split('\t')
-            line_0 = decontracted(line[0].lower())
-            line_1 = decontracted(line[1].lower())
-            line_2 = decontracted(line[2].lower())
-            
-            if mode == "train":
-                # Train data contains id, 3 turns and label
-                label = emotion2label[items[4]]
-                labels.append(label)
-            
-            conv = ' '.join(line)
-            
-            u1.append(line_0)
-            u2.append(line_1)
-            u3.append(line_2)
-            
-            # Remove any duplicate spaces
-            duplicateSpacePattern = re.compile(r'\ +')
-            conv = re.sub(duplicateSpacePattern, ' ', conv)
-            
-            indices.append(int(items[0]))
-            conversations.append(conv.lower())
-    
-    if mode == "train":
-        return indices, conversations, labels, u1, u2, u3
-    else:
-        return indices, conversations, u1, u2, u3
+from preprocess import decontracted, preprocessData
+from util import label2emotion, emotion2label
 
 
 def getMetrics(predictions, ground):
@@ -196,19 +54,19 @@ def getMetrics(predictions, ground):
         accuracy : Average accuracy
         microPrecision : Precision calculated on a micro level. Ref - https://datascience.stackexchange.com/questions/15989/micro-average-vs-macro-average-performance-in-a-multiclass-classification-settin/16001
         microRecall : Recall calculated on a micro level
-        microF1 : Harmonic mean of microPrecision and microRecall. Higher value implies better classification  
+        microF1 : Harmonic mean of microPrecision and microRecall. Higher value implies better classification
     """
     # [0.1, 0.3 , 0.2, 0.1] -> [0, 1, 0, 0]
     discretePredictions = to_categorical(predictions.argmax(axis=1))
-    
+
     truePositives = np.sum(discretePredictions*ground, axis=0)
     falsePositives = np.sum(np.clip(discretePredictions - ground, 0, 1), axis=0)
     falseNegatives = np.sum(np.clip(ground-discretePredictions, 0, 1), axis=0)
-    
+
     print("True Positives per class : ", truePositives)
     print("False Positives per class : ", falsePositives)
     print("False Negatives per class : ", falseNegatives)
-    
+
     # ------------- Macro level calculation ---------------
     macroPrecision = 0
     macroRecall = 0
@@ -220,29 +78,29 @@ def getMetrics(predictions, ground):
         macroRecall += recall
         f1 = ( 2 * recall * precision ) / (precision + recall) if (precision+recall) > 0 else 0
         print("Class %s : Precision : %.3f, Recall : %.3f, F1 : %.3f" % (label2emotion[c], precision, recall, f1))
-    
+
     macroPrecision /= 3
     macroRecall /= 3
     macroF1 = (2 * macroRecall * macroPrecision ) / (macroPrecision + macroRecall) if (macroPrecision+macroRecall) > 0 else 0
-    print("Ignoring the Others class, Macro Precision : %.4f, Macro Recall : %.4f, Macro F1 : %.4f" % (macroPrecision, macroRecall, macroF1))   
-    
+    print("Ignoring the Others class, Macro Precision : %.4f, Macro Recall : %.4f, Macro F1 : %.4f" % (macroPrecision, macroRecall, macroF1))
+
     # ------------- Micro level calculation ---------------
     truePositives = truePositives[1:].sum()
     falsePositives = falsePositives[1:].sum()
-    falseNegatives = falseNegatives[1:].sum()    
-    
+    falseNegatives = falseNegatives[1:].sum()
+
     print("Ignoring the Others class, Micro TP : %d, FP : %d, FN : %d" % (truePositives, falsePositives, falseNegatives))
-    
+
     microPrecision = truePositives / (truePositives + falsePositives)
     microRecall = truePositives / (truePositives + falseNegatives)
-    
+
     microF1 = ( 2 * microRecall * microPrecision ) / (microPrecision + microRecall) if (microPrecision+microRecall) > 0 else 0
     # -----------------------------------------------------
-    
+
     predictions = predictions.argmax(axis=1)
     ground = ground.argmax(axis=1)
     accuracy = np.mean(predictions==ground)
-    
+
     print("Accuracy : %.4f, Micro Precision : %.4f, Micro Recall : %.4f, Micro F1 : %.4f" % (accuracy, microPrecision, microRecall, microF1))
     return accuracy, microPrecision, microRecall, microF1
 
@@ -267,7 +125,7 @@ def writeNormalisedData(dataFilePath, texts):
                 fout.write(line[3] + '\t' + normalisedLine[2] + '\t')
                 try:
                     # If label information available (train time)
-                    fout.write(line[4] + '\n')    
+                    fout.write(line[4] + '\n')
                 except:
                     # If label information not available (test time)
                     fout.write('\n')
@@ -282,7 +140,7 @@ def getEmbeddingMatrix(wordIndex, out_of_vocab):
         embeddingMatrix : A matrix where every row has 100 dimensional GloVe embedding
     """
     embeddingsIndex = {}
-    
+
     # Load the embedding vectors from ther GloVe file #glove.twitter.27B.100d.txt #glove.840B.300d.txt #glove.twitter.emoji.100d.txt
     #with io.open(os.path.join(gloveDir, 'glove.twitter.emoji.100d.txt'), encoding="utf8") as f:
     vocab = []
@@ -294,13 +152,13 @@ def getEmbeddingMatrix(wordIndex, out_of_vocab):
             vocab.append(word)
             embeddingVector = np.array([float(val) for val in values[1:]])
             embeddingsIndex[word] = embeddingVector
-    
+
     print('Found %s word vectors.' % len(embeddingsIndex))
-    
+
     #model = gensim.models.KeyedVectors.load_word2vec_format(gloveDir, binary=False)
     #vocab = model.vocab.keys()
 
-    # Minimum word index of any word is 1. 
+    # Minimum word index of any word is 1.
     embeddingMatrix = np.zeros((len(wordIndex) + 1, EMBEDDING_DIM))
     for word, i in wordIndex.items():
         embeddingVector = embeddingsIndex.get(word)
@@ -314,9 +172,9 @@ def getEmbeddingMatrix(wordIndex, out_of_vocab):
         if embeddingVector is not None:
             # words not found in embedding index will be all-zeros.
             embeddingMatrix[i] = embeddingVector
-    
+
     return embeddingMatrix, embeddingsIndex
-        
+
 
 def buildModel(embeddingMatrix):
     """Constructs the architecture of the model
@@ -351,9 +209,9 @@ def buildModel(embeddingMatrix):
     lstm_up = LSTM(LSTM_DIM, dropout=DROPOUT)
 
     out_lstm = lstm_up(inp)
-    
+
     out = Dense(NUM_CLASSES, activation='softmax')(out_lstm)
-    
+
     adam = optimizers.adam(lr=LEARNING_RATE)
     model = Model([x1,x2,x3],out)
     model.compile(loss='categorical_crossentropy',
@@ -361,7 +219,7 @@ def buildModel(embeddingMatrix):
                   metrics=['acc'])
     print(model.summary())
     return model
-    
+
 
 def main():
     parser = argparse.ArgumentParser(description="Baseline Script for SemEval")
@@ -370,17 +228,17 @@ def main():
 
     with open(args.config) as configfile:
         config = json.load(configfile)
-        
+
     global trainDataPath, testDataPath, solutionPath, gloveDir
     global NUM_FOLDS, NUM_CLASSES, MAX_NB_WORDS, MAX_SEQUENCE_LENGTH, EMBEDDING_DIM
-    global BATCH_SIZE, LSTM_DIM, DROPOUT, NUM_EPOCHS, LEARNING_RATE    
-    
+    global BATCH_SIZE, LSTM_DIM, DROPOUT, NUM_EPOCHS, LEARNING_RATE
+
     trainDataPath = config["train_data_path"]
     valDataPath = config["val_data_path"]
     testDataPath = config["test_data_path"]
     solutionPath = config["solution_path"]
     gloveDir = config["glove_dir"]
-    
+
     NUM_FOLDS = config["num_folds"]
     NUM_CLASSES = config["num_classes"]
     MAX_NB_WORDS = config["max_nb_words"]
@@ -391,10 +249,10 @@ def main():
     DROPOUT = config["dropout"]
     LEARNING_RATE = config["learning_rate"]
     NUM_EPOCHS = config["num_epochs"]
-        
+
     print("Processing training data...")
     trainIndices, trainTexts, labels, u1_train, u2_train, u3_train = preprocessData(trainDataPath, mode="train")
-    # Write normalised text to file to check if normalisation works. Disabled now. Uncomment following line to enable   
+    # Write normalised text to file to check if normalisation works. Disabled now. Uncomment following line to enable
     # writeNormalisedData(trainDataPath, trainTexts)
     print("Processing val data...")
     valIndices, valTexts, vallabels, u1_val, u2_val, u3_val = preprocessData(valDataPath, mode="train")
@@ -410,7 +268,7 @@ def main():
     for sent in u1_train+u2_train+u3_train+u1_val+u2_val+u3_val+u1_test+u2_test+u3_test:
         vocab.extend(tokenizer.tokenize(sent))
 
-    wordIndex = {} 
+    wordIndex = {}
     for i, word in enumerate(list(set(vocab))):
         wordIndex[word] = i+1
 
@@ -452,7 +310,7 @@ def main():
     labels = to_categorical(np.asarray(labels))
     print("Shape of training data tensor: ", u1_data.shape)
     print("Shape of label tensor: ", labels.shape)
-    
+
     u1_val = pad_sequences(u1_valSequences, maxlen=MAX_SEQUENCE_LENGTH)
     u2_val = pad_sequences(u2_valSequences, maxlen=MAX_SEQUENCE_LENGTH)
     u3_val = pad_sequences(u3_valSequences, maxlen=MAX_SEQUENCE_LENGTH)
@@ -468,18 +326,18 @@ def main():
     #u3_data = u3_data[trainIndices]
 
     #labels = labels[trainIndices]
-    
+
     # Perform k-fold cross validation
     metrics = {"accuracy" : [],
                "microPrecision" : [],
                "microRecall" : [],
                "microF1" : []}
-    
+
     print("Starting k-fold cross validation...")
     print('-'*40)
     print("Building model...")
     model = buildModel(embeddingMatrix)
-    model.fit([u1_data,u2_data,u3_data], labels, 
+    model.fit([u1_data,u2_data,u3_data], labels,
                   validation_data=[xVal, yVal],
                   epochs=NUM_EPOCHS, batch_size=BATCH_SIZE)
 
@@ -489,15 +347,15 @@ def main():
     metrics["microPrecision"].append(microPrecision)
     metrics["microRecall"].append(microRecall)
     metrics["microF1"].append(microF1)
-       
+
     print("\n============= Metrics =================")
     print("Average Cross-Validation Accuracy : %.4f" % (sum(metrics["accuracy"])/len(metrics["accuracy"])))
     print("Average Cross-Validation Micro Precision : %.4f" % (sum(metrics["microPrecision"])/len(metrics["microPrecision"])))
     print("Average Cross-Validation Micro Recall : %.4f" % (sum(metrics["microRecall"])/len(metrics["microRecall"])))
     print("Average Cross-Validation Micro F1 : %.4f" % (sum(metrics["microF1"])/len(metrics["microF1"])))
-    
+
     print("\n======================================")
-    
+
     print("Retraining model on entire data to create solution file")
     #model = buildModel(embeddingMatrix)
     #model.fit([u1_data,u2_data,u3_data], labels, epochs=NUM_EPOCHS, batch_size=BATCH_SIZE)
@@ -510,16 +368,16 @@ def main():
     predictions = predictions.argmax(axis=1)
 
     with io.open(solutionPath, "w", encoding="utf8") as fout:
-        fout.write('\t'.join(["id", "turn1", "turn2", "turn3", "label"]) + '\n')        
+        fout.write('\t'.join(["id", "turn1", "turn2", "turn3", "label"]) + '\n')
         with io.open(testDataPath, encoding="utf8") as fin:
             fin.readline()
             for lineNum, line in enumerate(fin):
                 fout.write('\t'.join(line.strip().split('\t')[:4]) + '\t')
                 fout.write(label2emotion[predictions[lineNum]] + '\n')
     print("Completed. Model parameters: ")
-    print("Learning rate : %.3f, LSTM Dim : %d, Dropout : %.3f, Batch_size : %d" 
+    print("Learning rate : %.3f, LSTM Dim : %d, Dropout : %.3f, Batch_size : %d"
          % (LEARNING_RATE, LSTM_DIM, DROPOUT, BATCH_SIZE))
-    
-               
+
+
 if __name__ == '__main__':
     main()
