@@ -253,12 +253,12 @@ def main():
     print("Processing training data...")
     trainIndices, trainTexts, labels, u1_train, u2_train, u3_train = preprocessData(trainDataPath, mode="train")
     # Write normalised text to file to check if normalisation works. Disabled now. Uncomment following line to enable
-    # writeNormalisedData(trainDataPath, trainTexts)
+    writeNormalisedData(trainDataPath, trainTexts)
     print("Processing val data...")
     valIndices, valTexts, vallabels, u1_val, u2_val, u3_val = preprocessData(valDataPath, mode="train")
     print("Processing test data...")
     testIndices, testTexts, u1_test, u2_test, u3_test = preprocessData(testDataPath, mode="test")
-    # writeNormalisedData(testDataPath, testTexts)
+    writeNormalisedData(testDataPath, testTexts)
 
     print("Extracting tokens...")
     from nltk.tokenize import TweetTokenizer

@@ -1,4 +1,5 @@
 #Please use python 3.5 or above
+import csv
 import numpy as np
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
@@ -22,6 +23,10 @@ from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
 import num2words
 import gensim
+from argparse import (
+    ArgumentParser,
+    ArgumentDefaultsHelpFormatter
+)
 
 label2emotion = {0:"others", 1:"happy", 2: "sad", 3:"angry"}
 emotion2label = {"others":0, "happy":1, "sad":2, "angry":3}
@@ -145,8 +150,17 @@ def preprocess_twitter(dataFilePath):
     return indices, elements
 
 
-with open('tweets_cleaned.csv', 'w') as fp:
-    writer = csv.writer(fp, delimiter='\t')
-    writer.writerow(['index', 'tweet'])
-    for index, tweet in zip(*preprocess_twitter('tweets.csv')):
-        writer.writerow([index, tweet])
+def get_clargs():
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-i", "--in-file", help="Input file.")
+    parser.add_argument("-o", "--out-file", help="Output file.")
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = get_clargs()
+    with open(args.out_file, 'w') as fp:
+        writer = csv.writer(fp, delimiter='\t')
+        writer.writerow(['index', 'tweet'])
+        for index, tweet in zip(*preprocess_twitter(args.in_file)):
+            writer.writerow([index, tweet])
